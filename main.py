@@ -33,6 +33,48 @@ class WikiDomainChecker:
         self.stop_requested = False
         self.setup_ui()
         
+    def save_csv(self):
+        if not self.all_checked_domains:
+            messagebox.showwarning("Предупреждение", "Нет данных для сохранения")
+            return
+            
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")]
+        )
+        
+        if filepath:
+            try:
+                with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["Ключевое слово", "Статья", "Ссылка", "Домен", "Статус", "Архив"])
+                    writer.writerows(self.all_checked_domains)
+                messagebox.showinfo("Успех", f"Сохранено {len(self.all_checked_domains)} записей в: {filepath}")
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
+                
+    def save_excel(self):
+        if not self.all_checked_domains:
+            messagebox.showwarning("Предупреждение", "Нет данных для сохранения")
+            return
+            
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")]
+        )
+        
+        if filepath:
+            try:
+                df = pd.DataFrame(self.all_checked_domains, 
+                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен", "Статус", "Архив"])
+                df.to_excel(filepath, index=False)
+                messagebox.showinfo("Успех", f"Сохранено {len(self.all_checked_domains)} записей в: {filepath}")
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
+                
+    def open_contact(self):
+        webbrowser.open("https://t.me/Userspoi")
+        
     def setup_ui(self):
         # Заголовок
         title_label = tk.Label(self.root, text="WikiLink Domain Checker", 
