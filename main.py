@@ -123,16 +123,16 @@ class WikiDomainChecker:
         self.log_text = scrolledtext.ScrolledText(self.root, height=12, width=70)
         self.log_text.pack(pady=5, padx=20, fill='both', expand=True)
         
-        # Кнопки сохранения - ИЗМЕНЕНО: теперь активны сразу
+        # Кнопки сохранения - АКТИВНЫ С САМОГО НАЧАЛА
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
         
         self.save_csv_button = tk.Button(button_frame, text="Сохранить CSV", 
-                                        command=self.save_csv)  # Убрали state='disabled'
+                                        command=self.save_csv, bg="#FF9800", fg="white")
         self.save_csv_button.pack(side='left', padx=5)
         
         self.save_excel_button = tk.Button(button_frame, text="Сохранить Excel", 
-                                          command=self.save_excel)  # Убрали state='disabled'
+                                          command=self.save_excel, bg="#9C27B0", fg="white")
         self.save_excel_button.pack(side='left', padx=5)
         
         # Кнопка связи
@@ -161,7 +161,6 @@ class WikiDomainChecker:
         self.stop_requested = False
         self.start_button.config(state='disabled')
         self.stop_button.config(state='normal')
-        # ИЗМЕНЕНО: убрали отключение кнопок сохранения
         self.progress.start()
         self.status_label.config(text="Проверка...", fg="orange")
         self.log_text.delete(1.0, tk.END)
@@ -238,7 +237,7 @@ class WikiDomainChecker:
                         self.log(f"  ✗ Домен {domain} занят")
                         self.log(f"    📅 Архив: {archive_text}")
                     
-                    time.sleep(random.uniform(1.0, 2.0))  # Увеличиваем задержку для Archive.org
+                    time.sleep(random.uniform(1.0, 2.0))
                     
         except Exception as e:
             self.log(f"Ошибка: {e}")
@@ -250,8 +249,6 @@ class WikiDomainChecker:
         self.progress.stop()
         self.start_button.config(state='normal')
         self.stop_button.config(state='disabled')
-        
-        # ИЗМЕНЕНО: убрали активацию кнопок сохранения, они уже активны
         
         if self.results:
             self.log(f"\nНайдено {len(self.results)} доступных доменов")
@@ -269,7 +266,7 @@ class WikiDomainChecker:
     def search_wikipedia(self, keywords, language):
         user_agent = "WikiLinkChecker/1.0"
         wiki_wiki = wikipediaapi.Wikipedia(
-            language=language,  # Используем переданный язык
+            language=language,
             extract_format=wikipediaapi.ExtractFormat.WIKI,
             user_agent=user_agent
         )
@@ -337,7 +334,6 @@ class WikiDomainChecker:
     def check_archive_org(self, domain):
         """Проверяет историю домена в Archive.org"""
         try:
-            # API Wayback Machine для проверки снимков
             url = f"http://archive.org/wayback/available?url={domain}"
             headers = {"User-Agent": "WikiLinkChecker/1.0"}
             
@@ -352,7 +348,6 @@ class WikiDomainChecker:
                 if snapshot.get('available'):
                     timestamp = snapshot.get('timestamp', '')
                     if timestamp:
-                        # Форматируем дату (YYYYMMDDHHMMSS -> YYYY-MM-DD)
                         date_str = f"{timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]}"
                         return f"последний снимок {date_str}"
                     return "найдены снимки"
