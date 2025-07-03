@@ -186,6 +186,7 @@ class WikiDomainChecker:
         self.is_running = False
         self.progress.stop()
         self.start_button.config(state='normal')
+        self.stop_button.config(state='disabled')
         
         if self.results:
             self.log(f"\nНайдено {len(self.results)} доступных доменов")
@@ -196,20 +197,39 @@ class WikiDomainChecker:
             self.log("\nДоступные домены не найдены")
             self.status_label.config(text="Готово", fg="green")
             
-    def search_wikipedia(self, keywords):
+    def search_wikipedia(self, keywords, language):
         user_agent = "WikiLinkChecker/1.0"
         wiki_wiki = wikipediaapi.Wikipedia(
-            language='ru',
+            language=language,  # Используем переданный язык
             extract_format=wikipediaapi.ExtractFormat.WIKI,
             user_agent=user_agent
         )
         
         results = []
         for keyword in keywords:
-            page = wiki_wiki.page(keyword)
-            if page.exists():
-                if any(word.lower() in page.text.lower() for word in keywords):
+            if self.stop_requested:
+                break
+                
+            try:
+                # Сначала пытаемся найти точное совпадение
+                page = wiki_wiki.page(keyword)
+                if page.exists():
                     results.append((keyword, page.title, page.fullurl))
+                    continue
+                
+                # Если точное совпадение не найдено, используем поиск
+                search_results = wiki_wiki.search(keyword, results=5)
+                for search_result in search_results:
+                    if self.stop_requested:
+                        break
+                    page = wiki_wiki.page(search_result)
+                    if page.exists():
+                        results.append((keyword, page.title, page.fullurl))
+                        
+            except Exception as e:
+                self.log(f"Ошибка при поиске '{keyword}': {e}")
+                continue
+                
         return results
         
     def fetch_external_links(self, page_url):
@@ -225,27 +245,48 @@ class WikiDomainChecker:
             for a_tag in soup.find_all('a', href=True):
                 href = a_tag['href']
                 if href.startswith(('http://', 'https://')):
-                    external_links.add(href)
-                    
+                    # Фильтруем ссылки на саму Wikipedia
+                    if 'wikipedia.org' not in href and 'wikimedia.org' not in href:
+                        external_links.add(href)
+                        
             return external_links
-        except:
+        except Exception as e:
+            self.log(f"Ошибка при извлечении ссылок: {e}")
             return set()
             
     def get_domain(self, url):
-        return urlparse(url).netloc
-        
+        try:
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            # Убираем www. если есть
+            if domain.startswith('www.'):
+                domain = domain[4:]
+            return domain
+        except:
+            return None
+            
     def check_domain_availability(self, domain):
         try:
+            # Проверяем через whois если доступен
             if whois:
-                w = whois.whois(domain)
-                if w.domain_name:
-                    return False
+                try:
+                    w = whois.whois(domain)
+                    if w.domain_name:
+                        return False
+                except:
+                    pass
                     
-            answers = dns.resolver.resolve(domain, 'A')
-            return False
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
-            return True
-        except:
+            # Проверяем через DNS
+            try:
+                answers = dns.resolver.resolve(domain, 'A')
+                return False  # Если есть A-записи, домен занят
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+                return True  # Домен доступен
+            except:
+                return False  # Ошибка - считаем домен недоступным
+                
+        except Exception as e:
+            self.log(f"Ошибка проверки домена {domain}: {e}")
             return False
             
     def save_csv(self):
