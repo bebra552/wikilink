@@ -86,16 +86,16 @@ class WikiDomainChecker:
         button_frame.pack(pady=10)
         
         self.save_csv_button = tk.Button(button_frame, text="Сохранить CSV", 
-                                        command=lambda: self.save_csv(), state='disabled')
+                                        command=self.save_csv, state='disabled')
         self.save_csv_button.pack(side='left', padx=5)
         
         self.save_excel_button = tk.Button(button_frame, text="Сохранить Excel", 
-                                          command=lambda: self.save_excel(), state='disabled')
+                                          command=self.save_excel, state='disabled')
         self.save_excel_button.pack(side='left', padx=5)
         
         # Кнопка связи
         contact_button = tk.Button(button_frame, text="Связь", 
-                                  command=lambda: self.open_contact(), bg="#2196F3", fg="white")
+                                  command=self.open_contact, bg="#2196F3", fg="white")
         contact_button.pack(side='left', padx=5)
         
     def log(self, message):
