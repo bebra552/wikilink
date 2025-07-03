@@ -28,6 +28,7 @@ class WikiDomainChecker:
         
         self.results = []
         self.is_running = False
+        self.stop_requested = False
         self.setup_ui()
         
     def setup_ui(self):
@@ -41,11 +42,29 @@ class WikiDomainChecker:
         self.keywords_entry = tk.Entry(self.root, width=60)
         self.keywords_entry.pack(pady=5)
         
-        # Кнопка запуска
-        self.start_button = tk.Button(self.root, text="Начать проверку", 
+        # Выбор языка
+        lang_frame = tk.Frame(self.root)
+        lang_frame.pack(pady=5)
+        tk.Label(lang_frame, text="Язык Wikipedia:").pack(side='left', padx=5)
+        self.lang_var = tk.StringVar(value="ru")
+        lang_options = [("Русский", "ru"), ("English", "en"), ("Deutsch", "de"), ("Français", "fr")]
+        for text, value in lang_options:
+            tk.Radiobutton(lang_frame, text=text, variable=self.lang_var, 
+                          value=value).pack(side='left', padx=5)
+        
+        # Кнопки управления
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(pady=10)
+        
+        self.start_button = tk.Button(control_frame, text="Начать проверку", 
                                      command=self.start_check, bg="#4CAF50", 
                                      fg="white", font=("Arial", 10, "bold"))
-        self.start_button.pack(pady=10)
+        self.start_button.pack(side='left', padx=5)
+        
+        self.stop_button = tk.Button(control_frame, text="Стоп", 
+                                    command=self.stop_check, bg="#f44336", 
+                                    fg="white", font=("Arial", 10, "bold"), state='disabled')
+        self.stop_button.pack(side='left', padx=5)
         
         # Прогресс бар
         self.progress = ttk.Progressbar(self.root, mode='indeterminate')
@@ -92,9 +111,12 @@ class WikiDomainChecker:
             return
             
         keywords = [kw.strip() for kw in keywords_text.split(',')]
+        language = self.lang_var.get()
         
         self.is_running = True
+        self.stop_requested = False
         self.start_button.config(state='disabled')
+        self.stop_button.config(state='normal')
         self.save_csv_button.config(state='disabled')
         self.save_excel_button.config(state='disabled')
         self.progress.start()
@@ -102,13 +124,20 @@ class WikiDomainChecker:
         self.log_text.delete(1.0, tk.END)
         self.results = []
         
-        thread = threading.Thread(target=self.check_domains, args=(keywords,))
+        thread = threading.Thread(target=self.check_domains, args=(keywords, language))
         thread.start()
         
-    def check_domains(self, keywords):
+    def stop_check(self):
+        self.stop_requested = True
+        self.log("Остановка проверки...")
+        
+    def check_domains(self, keywords, language):
         try:
-            self.log("Поиск страниц Wikipedia...")
-            pages = self.search_wikipedia(keywords)
+            if self.stop_requested:
+                return
+                
+            self.log(f"Поиск страниц Wikipedia ({language})...")
+            pages = self.search_wikipedia(keywords, language)
             
             if not pages:
                 self.log("Страницы не найдены")
@@ -118,6 +147,9 @@ class WikiDomainChecker:
             self.log(f"Найдено {len(pages)} страниц")
             
             for keyword, title, url in pages:
+                if self.stop_requested:
+                    break
+                    
                 self.log(f"Проверка страницы: {title} ({url})")
                 external_links = self.fetch_external_links(url)
                 
@@ -128,6 +160,9 @@ class WikiDomainChecker:
                 self.log(f"Найдено {len(external_links)} внешних ссылок. Проверяем доступность доменов...")
                 
                 for link in external_links:
+                    if self.stop_requested:
+                        break
+                        
                     domain = self.get_domain(link)
                     if not domain or ':' in domain:
                         continue
