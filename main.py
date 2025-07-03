@@ -13,6 +13,7 @@ import pandas as pd
 import random
 import os
 import webbrowser
+import json
 
 try:
     import whois
@@ -27,6 +28,7 @@ class WikiDomainChecker:
         self.root.resizable(False, False)
         
         self.results = []
+        self.all_checked_domains = []  # Все проверенные домены
         self.is_running = False
         self.stop_requested = False
         self.setup_ui()
@@ -123,6 +125,7 @@ class WikiDomainChecker:
         self.status_label.config(text="Проверка...", fg="orange")
         self.log_text.delete(1.0, tk.END)
         self.results = []
+        self.all_checked_domains = []  # Сбрасываем все проверенные домены
         
         thread = threading.Thread(target=self.check_domains, args=(keywords, language))
         thread.start()
@@ -169,13 +172,32 @@ class WikiDomainChecker:
                         
                     self.log(f"Проверяем домен: {domain}")
                     
-                    if self.check_domain_availability(domain):
+                    # Проверяем доступность домена
+                    is_available = self.check_domain_availability(domain)
+                    
+                    # Проверяем историю в Archive.org
+                    archive_info = self.check_archive_org(domain)
+                    archive_text = archive_info if archive_info else "не найден"
+                    
+                    # Добавляем в общий список всех проверенных доменов
+                    self.all_checked_domains.append((
+                        keyword, 
+                        title, 
+                        link, 
+                        domain, 
+                        "Доступен" if is_available else "Занят",
+                        archive_text
+                    ))
+                    
+                    if is_available:
                         self.log(f"  ✓ Домен {domain} доступен")
-                        self.results.append((keyword, title, link, domain))
+                        self.log(f"    📅 Архив: {archive_text}")
+                        self.results.append((keyword, title, link, domain, archive_text))
                     else:
                         self.log(f"  ✗ Домен {domain} занят")
+                        self.log(f"    📅 Архив: {archive_text}")
                     
-                    time.sleep(random.uniform(0.5, 1.0))
+                    time.sleep(random.uniform(1.0, 2.0))  # Увеличиваем задержку для Archive.org
                     
         except Exception as e:
             self.log(f"Ошибка: {e}")
@@ -188,14 +210,23 @@ class WikiDomainChecker:
         self.start_button.config(state='normal')
         self.stop_button.config(state='disabled')
         
-        if self.results:
-            self.log(f"\nНайдено {len(self.results)} доступных доменов")
+        # Активируем кнопки сохранения если есть хоть какие-то данные
+        if self.all_checked_domains:
             self.save_csv_button.config(state='normal')
             self.save_excel_button.config(state='normal')
+        
+        if self.results:
+            self.log(f"\nНайдено {len(self.results)} доступных доменов")
+            self.log(f"Всего проверено доменов: {len(self.all_checked_domains)}")
             self.status_label.config(text="Готово", fg="green")
         else:
-            self.log("\nДоступные домены не найдены")
-            self.status_label.config(text="Готово", fg="green")
+            if self.all_checked_domains:
+                self.log(f"\nДоступные домены не найдены")
+                self.log(f"Всего проверено доменов: {len(self.all_checked_domains)}")
+                self.status_label.config(text="Готово", fg="green")
+            else:
+                self.log("\nДомены для проверки не найдены")
+                self.status_label.config(text="Готово", fg="green")
             
     def search_wikipedia(self, keywords, language):
         user_agent = "WikiLinkChecker/1.0"
@@ -265,7 +296,34 @@ class WikiDomainChecker:
         except:
             return None
             
-    def check_domain_availability(self, domain):
+    def check_archive_org(self, domain):
+        """Проверяет историю домена в Archive.org"""
+        try:
+            # API Wayback Machine для проверки снимков
+            url = f"http://archive.org/wayback/available?url={domain}"
+            headers = {"User-Agent": "WikiLinkChecker/1.0"}
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                return None
+                
+            data = response.json()
+            
+            if data.get('archived_snapshots') and data['archived_snapshots'].get('closest'):
+                snapshot = data['archived_snapshots']['closest']
+                if snapshot.get('available'):
+                    timestamp = snapshot.get('timestamp', '')
+                    if timestamp:
+                        # Форматируем дату (YYYYMMDDHHMMSS -> YYYY-MM-DD)
+                        date_str = f"{timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]}"
+                        return f"последний снимок {date_str}"
+                    return "найдены снимки"
+            
+            return None
+            
+        except Exception as e:
+            self.log(f"Ошибка проверки Archive.org для {domain}: {e}")
+            return None
         try:
             # Проверяем через whois если доступен
             if whois:
@@ -288,8 +346,7 @@ class WikiDomainChecker:
         except Exception as e:
             self.log(f"Ошибка проверки домена {domain}: {e}")
             return False
-            
-    def save_csv(self):
+    def check_domain_availability(self, domain):
         if not self.results:
             return
             
@@ -302,7 +359,7 @@ class WikiDomainChecker:
             try:
                 with open(filepath, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f)
-                    writer.writerow(["Ключевое слово", "Статья", "Ссылка", "Домен"])
+                    writer.writerow(["Ключевое слово", "Статья", "Ссылка", "Домен", "Архив"])
                     writer.writerows(self.results)
                 messagebox.showinfo("Успех", f"Сохранено: {filepath}")
             except Exception as e:
@@ -320,7 +377,7 @@ class WikiDomainChecker:
         if filepath:
             try:
                 df = pd.DataFrame(self.results, 
-                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен"])
+                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен", "Архив"])
                 df.to_excel(filepath, index=False)
                 messagebox.showinfo("Успех", f"Сохранено: {filepath}")
             except Exception as e:
