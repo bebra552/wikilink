@@ -123,16 +123,16 @@ class WikiDomainChecker:
         self.log_text = scrolledtext.ScrolledText(self.root, height=12, width=70)
         self.log_text.pack(pady=5, padx=20, fill='both', expand=True)
         
-        # Кнопки сохранения
+        # Кнопки сохранения - ИЗМЕНЕНО: теперь активны сразу
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
         
         self.save_csv_button = tk.Button(button_frame, text="Сохранить CSV", 
-                                        command=self.save_csv, state='disabled')
+                                        command=self.save_csv)  # Убрали state='disabled'
         self.save_csv_button.pack(side='left', padx=5)
         
         self.save_excel_button = tk.Button(button_frame, text="Сохранить Excel", 
-                                          command=self.save_excel, state='disabled')
+                                          command=self.save_excel)  # Убрали state='disabled'
         self.save_excel_button.pack(side='left', padx=5)
         
         # Кнопка связи
@@ -161,8 +161,7 @@ class WikiDomainChecker:
         self.stop_requested = False
         self.start_button.config(state='disabled')
         self.stop_button.config(state='normal')
-        self.save_csv_button.config(state='disabled')
-        self.save_excel_button.config(state='disabled')
+        # ИЗМЕНЕНО: убрали отключение кнопок сохранения
         self.progress.start()
         self.status_label.config(text="Проверка...", fg="orange")
         self.log_text.delete(1.0, tk.END)
@@ -252,10 +251,7 @@ class WikiDomainChecker:
         self.start_button.config(state='normal')
         self.stop_button.config(state='disabled')
         
-        # Активируем кнопки сохранения если есть хоть какие-то данные
-        if self.all_checked_domains:
-            self.save_csv_button.config(state='normal')
-            self.save_excel_button.config(state='normal')
+        # ИЗМЕНЕНО: убрали активацию кнопок сохранения, они уже активны
         
         if self.results:
             self.log(f"\nНайдено {len(self.results)} доступных доменов")
@@ -366,6 +362,8 @@ class WikiDomainChecker:
         except Exception as e:
             self.log(f"Ошибка проверки Archive.org для {domain}: {e}")
             return None
+            
+    def check_domain_availability(self, domain):
         try:
             # Проверяем через whois если доступен
             if whois:
@@ -388,47 +386,7 @@ class WikiDomainChecker:
         except Exception as e:
             self.log(f"Ошибка проверки домена {domain}: {e}")
             return False
-    def check_domain_availability(self, domain):
-        if not self.results:
-            return
             
-        filepath = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv")]
-        )
-        
-        if filepath:
-            try:
-                with open(filepath, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["Ключевое слово", "Статья", "Ссылка", "Домен", "Архив"])
-                    writer.writerows(self.results)
-                messagebox.showinfo("Успех", f"Сохранено: {filepath}")
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
-                
-    def save_excel(self):
-        if not self.all_checked_domains:
-            messagebox.showwarning("Предупреждение", "Нет данных для сохранения")
-            return
-            
-        filepath = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx")]
-        )
-        
-        if filepath:
-            try:
-                df = pd.DataFrame(self.all_checked_domains, 
-                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен", "Статус", "Архив"])
-                df.to_excel(filepath, index=False)
-                messagebox.showinfo("Успех", f"Сохранено {len(self.all_checked_domains)} записей в: {filepath}")
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
-                
-    def open_contact(self):
-        webbrowser.open("https://t.me/Userspoi")
-        
     def run(self):
         self.root.mainloop()
 
