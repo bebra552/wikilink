@@ -86,16 +86,16 @@ class WikiDomainChecker:
         button_frame.pack(pady=10)
         
         self.save_csv_button = tk.Button(button_frame, text="Сохранить CSV", 
-                                        command=self.save_csv, state='disabled')
+                                        command=lambda: self.save_csv(), state='disabled')
         self.save_csv_button.pack(side='left', padx=5)
         
         self.save_excel_button = tk.Button(button_frame, text="Сохранить Excel", 
-                                          command=self.save_excel, state='disabled')
+                                          command=lambda: self.save_excel(), state='disabled')
         self.save_excel_button.pack(side='left', padx=5)
         
         # Кнопка связи
         contact_button = tk.Button(button_frame, text="Связь", 
-                                  command=self.open_contact, bg="#2196F3", fg="white")
+                                  command=lambda: self.open_contact(), bg="#2196F3", fg="white")
         contact_button.pack(side='left', padx=5)
         
     def log(self, message):
@@ -366,7 +366,8 @@ class WikiDomainChecker:
                 messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
                 
     def save_excel(self):
-        if not self.results:
+        if not self.all_checked_domains:
+            messagebox.showwarning("Предупреждение", "Нет данных для сохранения")
             return
             
         filepath = filedialog.asksaveasfilename(
@@ -376,10 +377,10 @@ class WikiDomainChecker:
         
         if filepath:
             try:
-                df = pd.DataFrame(self.results, 
-                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен", "Архив"])
+                df = pd.DataFrame(self.all_checked_domains, 
+                                columns=["Ключевое слово", "Статья", "Ссылка", "Домен", "Статус", "Архив"])
                 df.to_excel(filepath, index=False)
-                messagebox.showinfo("Успех", f"Сохранено: {filepath}")
+                messagebox.showinfo("Успех", f"Сохранено {len(self.all_checked_domains)} записей в: {filepath}")
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
                 
